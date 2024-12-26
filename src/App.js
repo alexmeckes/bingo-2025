@@ -28,11 +28,7 @@ function App() {
         </PrivateRoute>
       } />
       
-      <Route path="/join/:groupId" element={
-        <PrivateRoute>
-          <JoinGroup />
-        </PrivateRoute>
-      } />
+      <Route path="/join/:groupId" element={<JoinGroup />} />
       
       <Route path="/group/:groupId" element={
         <PrivateRoute>

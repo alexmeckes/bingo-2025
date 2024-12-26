@@ -4,17 +4,23 @@ import { AuthContext } from '../context/AuthProvider'
 
 function JoinGroup() {
   const { groupId } = useParams()
-  const { user, supabase } = useContext(AuthContext)
+  const { user, supabase, signIn } = useContext(AuthContext)
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [group, setGroup] = useState(null)
   const [joining, setJoining] = useState(false)
+  const [username, setUsername] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
 
   useEffect(() => {
-    checkGroup()
-  }, [groupId])
+    if (user) {
+      checkGroup()
+    } else {
+      setLoading(false)
+    }
+  }, [groupId, user])
 
   const checkGroup = async () => {
     if (!groupId) {
@@ -49,13 +55,6 @@ function JoinGroup() {
       // Check if group is in submission phase
       if (groupData.status !== 'submission') {
         setError('This group is no longer accepting new members')
-        setLoading(false)
-        return
-      }
-
-      // Check if submission deadline has passed
-      if (new Date(groupData.submission_deadline) < new Date()) {
-        setError('The submission deadline for this group has passed')
         setLoading(false)
         return
       }
@@ -100,51 +99,174 @@ function JoinGroup() {
     }
   }
 
+  const handleSignIn = async (e) => {
+    e.preventDefault()
+    setError(null)
+
+    if (!username.trim()) {
+      setError('Please enter a username')
+      return
+    }
+
+    setAuthLoading(true)
+    try {
+      const { error } = await signIn(username.trim())
+      if (error) throw error
+      // After sign in, useEffect will trigger checkGroup
+    } catch (err) {
+      setError(err.message)
+      setAuthLoading(false)
+    }
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-purple-200 via-pink-200 to-yellow-200">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
       </div>
     )
   }
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        {error ? (
-          <div>
-            <div className="rounded-md bg-red-50 p-4">
-              <div className="text-sm text-red-700">{error}</div>
+  // Show auth form if user is not logged in
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-purple-200 via-pink-200 to-yellow-200 py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-2xl mx-auto">
+          {/* Welcome Header */}
+          <div className="text-center bg-white border-4 border-double border-blue-500 shadow-lg p-6 rounded-lg">
+            <div className="animate-pulse">
+              <span className="text-red-500">★</span>
+              <span className="text-yellow-500">★</span>
+              <span className="text-green-500">★</span>
             </div>
-            <div className="mt-4 text-center">
+            <h2 className="text-4xl font-bold bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 text-transparent bg-clip-text">
+              Join Prediction Group
+            </h2>
+            <p className="mt-2 font-bold tracking-widest text-blue-600">
+              Choose a username to continue!
+            </p>
+            <div className="animate-pulse mt-2">
+              <span className="text-red-500">★</span>
+              <span className="text-yellow-500">★</span>
+              <span className="text-green-500">★</span>
+            </div>
+          </div>
+
+          {/* Username Form */}
+          <div className="mt-8 bg-white border-4 border-double border-emerald-500 shadow-lg rounded-lg">
+            <div className="px-4 py-5 sm:p-6">
+              {error && (
+                <div className="mb-6 border-2 border-red-500 bg-red-100 p-4 animate-pulse rounded-md">
+                  <div className="text-sm text-red-700 font-bold blink">{error}</div>
+                </div>
+              )}
+
+              <form onSubmit={handleSignIn} className="space-y-4">
+                <div>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter username..."
+                    className="mt-1 block w-full shadow-sm sm:text-sm 
+                      border-2 border-emerald-200 rounded-md
+                      bg-gradient-to-br from-white to-emerald-50
+                      hover:border-emerald-300 transition-colors cursor-retro
+                      focus:ring-emerald-500 focus:border-emerald-500"
+                    disabled={authLoading}
+                  />
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={authLoading}
+                    className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium 
+                      text-white bg-gradient-to-r from-emerald-500 to-teal-600 
+                      hover:from-emerald-600 hover:to-teal-700
+                      focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500
+                      disabled:opacity-50 cursor-retro"
+                  >
+                    {authLoading ? (
+                      <span className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Joining...
+                      </span>
+                    ) : (
+                      '✨ Join Group ✨'
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          {/* Marquee */}
+          <div className="mt-8 overflow-hidden">
+            <div className="text-center font-bold text-blue-600 animate-marquee whitespace-nowrap">
+              ⭐ WELCOME TO PREDICTION BINGO! ⭐ PICK A USERNAME! ⭐ JOIN THE GROUP! ⭐ HAVE FUN! ⭐
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-purple-200 via-pink-200 to-yellow-200 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-2xl mx-auto">
+        {error ? (
+          <div className="bg-white border-4 border-double border-red-500 shadow-lg p-6 rounded-lg">
+            <div className="text-center">
+              <h3 className="text-lg font-bold text-red-600 mb-2">Oops!</h3>
+              <p className="text-red-700">{error}</p>
               <button
                 onClick={() => navigate('/')}
-                className="text-indigo-600 hover:text-indigo-500"
+                className="mt-4 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium 
+                  text-white bg-gradient-to-r from-red-500 to-pink-600 
+                  hover:from-red-600 hover:to-pink-700
+                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500
+                  cursor-retro"
               >
-                Return to Home
+                Return Home
               </button>
             </div>
           </div>
         ) : group ? (
           <div>
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-              Join Prediction Group
-            </h2>
-            <div className="mt-4 bg-white shadow sm:rounded-lg">
+            <div className="text-center bg-white border-4 border-double border-blue-500 shadow-lg p-6 rounded-lg">
+              <div className="animate-pulse">
+                <span className="text-red-500">★</span>
+                <span className="text-yellow-500">★</span>
+                <span className="text-green-500">★</span>
+              </div>
+              <h2 className="text-4xl font-bold bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 text-transparent bg-clip-text">
+                {group.name}
+              </h2>
+              <p className="mt-2 font-bold tracking-widest text-blue-600">
+                Join this prediction group!
+              </p>
+              <div className="animate-pulse mt-2">
+                <span className="text-red-500">★</span>
+                <span className="text-yellow-500">★</span>
+                <span className="text-green-500">★</span>
+              </div>
+            </div>
+
+            <div className="mt-8 bg-white border-4 border-double border-emerald-500 shadow-lg rounded-lg">
               <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">
-                  {group.name}
-                </h3>
-                <div className="mt-2 max-w-xl text-sm text-gray-500">
-                  <p>Submission Deadline: {new Date(group.submission_deadline).toLocaleDateString()}</p>
-                  <p className="mt-1">Current Members: {group.group_members.length}</p>
-                </div>
-                <div className="mt-5">
+                <div className="flex justify-center">
                   <button
-                    type="button"
                     onClick={handleJoin}
                     disabled={joining}
-                    className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+                    className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium 
+                      text-white bg-gradient-to-r from-emerald-500 to-teal-600 
+                      hover:from-emerald-600 hover:to-teal-700
+                      focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500
+                      disabled:opacity-50 cursor-retro"
                   >
                     {joining ? (
                       <span className="flex items-center">
@@ -155,7 +277,7 @@ function JoinGroup() {
                         Joining...
                       </span>
                     ) : (
-                      'Join Group'
+                      '✨ Join Group ✨'
                     )}
                   </button>
                 </div>

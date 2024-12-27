@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthProvider'
 
 function JoinGroup() {
   const { groupId } = useParams()
-  const { user, supabase } = useContext(AuthContext)
+  const { user, supabase, login } = useContext(AuthContext)
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(true)
@@ -84,21 +84,21 @@ function JoinGroup() {
     setError(null)
 
     try {
-      // If not logged in, create user and set in context
+      const currentUsername = user ? user.username : username.trim()
+
+      // First ensure user exists in users table
+      const { error: userError } = await supabase
+        .from('users')
+        .insert([{ username: currentUsername }])
+        .select()
+
+      if (userError && !userError.message.includes('duplicate key')) {
+        throw userError
+      }
+
+      // If not logged in, set the user in context
       if (!user) {
-        // First ensure user exists in users table
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .insert([{ username: username.trim() }])
-          .select()
-          .single()
-
-        if (userError && !userError.message.includes('duplicate key')) {
-          throw userError
-        }
-
-        // Set the user in local storage
-        localStorage.setItem('user', JSON.stringify({ username: username.trim() }))
+        login(currentUsername)
       }
 
       // Double check group isn't locked
@@ -120,7 +120,7 @@ function JoinGroup() {
         .from('group_members')
         .insert([{
           group_id: groupId,
-          username: user ? user.username : username.trim(),
+          username: currentUsername,
           role: 'member'
         }])
 

@@ -98,6 +98,7 @@ function JoinGroup() {
 
       // If not logged in, set the user in context
       if (!user) {
+        // Call login function with the username
         login(currentUsername)
       }
 
@@ -126,8 +127,10 @@ function JoinGroup() {
 
       if (joinError) throw joinError
 
-      // Navigate to group page
-      navigate(`/group/${groupId}`)
+      // Navigate to group page after a short delay to ensure context is updated
+      setTimeout(() => {
+        navigate(`/group/${groupId}`)
+      }, 100)
     } catch (err) {
       console.error('Error joining group:', err)
       setError('Failed to join group')

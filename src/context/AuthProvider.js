@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect } from 'react'
+import { createContext, useState, useEffect, useCallback } from 'react'
 import { supabase } from '../supabaseClient'
 
 export const AuthContext = createContext()
@@ -16,19 +16,27 @@ export function AuthProvider({ children }) {
     setLoading(false)
   }, [])
 
-  const login = (username) => {
+  const login = useCallback((username) => {
     const userData = { username }
     localStorage.setItem('user', JSON.stringify(userData))
     setUser(userData)
-  }
+  }, [])
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem('user')
     setUser(null)
+  }, [])
+
+  const value = {
+    user,
+    supabase,
+    login,
+    logout,
+    loading
   }
 
   return (
-    <AuthContext.Provider value={{ user, supabase, login, logout, loading }}>
+    <AuthContext.Provider value={value}>
       {!loading && children}
     </AuthContext.Provider>
   )

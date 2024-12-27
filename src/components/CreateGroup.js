@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../context/AuthProvider'
 
 function CreateGroup() {
-  const { user, supabase } = useContext(AuthContext)
+  const { user, supabase, login } = useContext(AuthContext)
   const navigate = useNavigate()
 
   const [groupName, setGroupName] = useState('')
+  const [username, setUsername] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [recentGroups, setRecentGroups] = useState([])
@@ -28,18 +29,30 @@ function CreateGroup() {
     setSubmitting(true)
 
     try {
-      // Get current username from localStorage if user is null
-      const storedUser = localStorage.getItem('user')
-      console.log('Stored user:', storedUser)
-      const currentUsername = user ? user.username : (storedUser ? JSON.parse(storedUser).username : null)
-      console.log('Current username:', currentUsername)
+      let currentUsername = user?.username
+
+      // If no user exists, create one
+      if (!currentUsername && username.trim()) {
+        // First ensure user exists in users table
+        const { error: userError } = await supabase
+          .from('users')
+          .insert([{ username: username.trim() }])
+          .select()
+
+        if (userError && !userError.message.includes('duplicate key')) {
+          throw userError
+        }
+
+        // Set the username
+        currentUsername = username.trim()
+        login(currentUsername)
+      }
 
       if (!currentUsername) {
-        throw new Error('Please sign in to create a group')
+        throw new Error('Please enter a username')
       }
 
       // Create group
-      console.log('Creating group with name:', groupName, 'and organizer:', currentUsername)
       const { data: group, error: groupError } = await supabase
         .from('groups')
         .insert([{
@@ -50,12 +63,7 @@ function CreateGroup() {
         .select()
         .single()
 
-      if (groupError) {
-        console.error('Group creation error:', groupError)
-        throw groupError
-      }
-
-      console.log('Group created:', group)
+      if (groupError) throw groupError
 
       // Add creator as member
       const { error: memberError } = await supabase
@@ -66,15 +74,12 @@ function CreateGroup() {
           role: 'admin'
         }])
 
-      if (memberError) {
-        console.error('Member creation error:', memberError)
-        throw memberError
-      }
+      if (memberError) throw memberError
 
       // Navigate to the new group
       navigate(`/group/${group.id}`)
     } catch (err) {
-      console.error('Detailed error:', err)
+      console.error('Error:', err)
       setError(err.message || 'Failed to create group')
       setSubmitting(false)
     }
@@ -110,6 +115,27 @@ function CreateGroup() {
         <div className="mt-8 bg-white border-4 border-double border-emerald-500 shadow-lg rounded-lg">
           <div className="px-4 py-5 sm:p-6">
             <form onSubmit={handleSubmit} className="space-y-4">
+              {!user && (
+                <div>
+                  <label htmlFor="username" className="block text-sm font-medium text-gray-700">
+                    Choose a Username
+                  </label>
+                  <input
+                    type="text"
+                    name="username"
+                    id="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter your username..."
+                    required={!user}
+                    className="mt-1 block w-full shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm 
+                      border-2 border-indigo-200 rounded-md bg-gradient-to-br from-white to-indigo-50
+                      hover:border-indigo-300 transition-colors cursor-retro"
+                    disabled={submitting}
+                  />
+                </div>
+              )}
+              
               <div>
                 <label htmlFor="groupName" className="block text-sm font-medium text-gray-700">
                   Group Name
@@ -132,7 +158,7 @@ function CreateGroup() {
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  disabled={submitting || !groupName.trim()}
+                  disabled={submitting || !groupName.trim() || (!user && !username.trim())}
                   className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium 
                     text-white bg-gradient-to-r from-indigo-500 to-purple-600 
                     hover:from-indigo-600 hover:to-purple-700 focus:outline-none focus:ring-2 

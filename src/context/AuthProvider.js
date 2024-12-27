@@ -1,7 +1,11 @@
-import { createContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useState, useEffect } from 'react'
 import { supabase } from '../supabaseClient'
 
-export const AuthContext = createContext()
+export const AuthContext = createContext({
+  user: null,
+  supabase,
+  loading: true
+})
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -11,32 +15,38 @@ export function AuthProvider({ children }) {
     // Check for user in localStorage
     const storedUser = localStorage.getItem('user')
     if (storedUser) {
-      setUser(JSON.parse(storedUser))
+      try {
+        setUser(JSON.parse(storedUser))
+      } catch (e) {
+        console.error('Error parsing stored user:', e)
+        localStorage.removeItem('user')
+      }
     }
     setLoading(false)
   }, [])
 
-  const login = useCallback((username) => {
-    const userData = { username }
-    localStorage.setItem('user', JSON.stringify(userData))
-    setUser(userData)
-  }, [])
+  // Update user state whenever localStorage changes
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const storedUser = localStorage.getItem('user')
+      if (storedUser) {
+        try {
+          setUser(JSON.parse(storedUser))
+        } catch (e) {
+          console.error('Error parsing stored user:', e)
+          localStorage.removeItem('user')
+        }
+      } else {
+        setUser(null)
+      }
+    }
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('user')
-    setUser(null)
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
   }, [])
-
-  const value = {
-    user,
-    supabase,
-    login,
-    logout,
-    loading
-  }
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{ user, supabase, loading }}>
       {!loading && children}
     </AuthContext.Provider>
   )

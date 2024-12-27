@@ -443,6 +443,22 @@ function GroupDashboard() {
             ⭐ WELCOME TO YOUR PREDICTION GROUP! ⭐ MAKE YOUR PREDICTIONS! ⭐ CHECK THE BINGO BOARD! ⭐
           </div>
         </div>
+
+        {/* Create New Group Button */}
+        <div className="mt-8 text-center">
+          <button
+            onClick={() => navigate('/')}
+            className="inline-flex items-center px-6 py-3 border border-transparent text-lg font-medium rounded-md shadow-lg
+              text-white bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 
+              hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600
+              transform hover:scale-105 transition-all duration-200
+              focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 cursor-retro"
+          >
+            <span className="mr-2">✨</span>
+            Create Another Group
+            <span className="ml-2">✨</span>
+          </button>
+        </div>
       </div>
     </div>
   )

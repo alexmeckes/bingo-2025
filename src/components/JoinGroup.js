@@ -10,6 +10,8 @@ function JoinGroup() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [group, setGroup] = useState(null)
+  const [username, setUsername] = useState('')
+  const [joining, setJoining] = useState(false)
 
   useEffect(() => {
     checkGroup()
@@ -23,26 +25,14 @@ function JoinGroup() {
     }
 
     try {
-      // Check if group exists and if user is already a member
-      const [groupResponse, memberResponse] = await Promise.all([
-        supabase
-          .from('groups')
-          .select('*')
-          .eq('id', groupId)
-          .single(),
-        supabase
-          .from('group_members')
-          .select('*')
-          .eq('group_id', groupId)
-          .eq('username', user.username)
-          .single()
-      ])
+      // Just check if group exists and is not locked
+      const { data: groupData, error: groupError } = await supabase
+        .from('groups')
+        .select('*')
+        .eq('id', groupId)
+        .single()
 
-      if (groupResponse.error && groupResponse.error.code !== 'PGRST116') {
-        throw groupResponse.error
-      }
-
-      const groupData = groupResponse.data
+      if (groupError) throw groupError
       if (!groupData) {
         setError('This group no longer exists')
         setLoading(false)
@@ -57,10 +47,22 @@ function JoinGroup() {
         return
       }
 
-      // If user is already a member, redirect to group
-      if (memberResponse.data) {
-        navigate(`/group/${groupId}`)
-        return
+      // If user is logged in, check if already a member
+      if (user) {
+        const { data: memberData, error: memberError } = await supabase
+          .from('group_members')
+          .select('*')
+          .eq('group_id', groupId)
+          .eq('username', user.username)
+          .single()
+
+        if (memberError && memberError.code !== 'PGRST116') throw memberError
+
+        // If user is already a member, redirect to group
+        if (memberData) {
+          navigate(`/group/${groupId}`)
+          return
+        }
       }
 
       setGroup(groupData)
@@ -73,10 +75,25 @@ function JoinGroup() {
   }
 
   const handleJoin = async () => {
-    setLoading(true)
+    if (!username.trim()) {
+      setError('Please enter a username')
+      return
+    }
+
+    setJoining(true)
     setError(null)
 
     try {
+      // First ensure user exists in users table
+      const { error: userError } = await supabase
+        .from('users')
+        .insert([{ username: username.trim() }])
+        .select()
+
+      if (userError && !userError.message.includes('duplicate key')) {
+        throw userError
+      }
+
       // Double check group isn't locked
       const { data: groupData, error: groupError } = await supabase
         .from('groups')
@@ -87,7 +104,7 @@ function JoinGroup() {
       if (groupError) throw groupError
       if (groupData.is_locked) {
         setError('This group is no longer accepting new members')
-        setLoading(false)
+        setJoining(false)
         return
       }
 
@@ -96,7 +113,7 @@ function JoinGroup() {
         .from('group_members')
         .insert([{
           group_id: groupId,
-          username: user.username,
+          username: username.trim(),
           role: 'member'
         }])
 
@@ -107,7 +124,7 @@ function JoinGroup() {
     } catch (err) {
       console.error('Error joining group:', err)
       setError('Failed to join group')
-      setLoading(false)
+      setJoining(false)
     }
   }
 
@@ -157,15 +174,27 @@ function JoinGroup() {
               <p className="mt-2 text-2xl font-bold text-indigo-600">
                 {group?.name}
               </p>
+              {!user && (
+                <div className="mt-6">
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Choose a username..."
+                    className="block w-full px-4 py-2 mt-2 text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm cursor-retro"
+                    disabled={joining}
+                  />
+                </div>
+              )}
               <button
-                onClick={handleJoin}
-                disabled={loading}
+                onClick={user ? handleJoin : handleJoin}
+                disabled={joining || (!user && !username.trim())}
                 className="mt-6 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium 
                   text-white bg-gradient-to-r from-indigo-500 to-purple-600 
                   hover:from-indigo-600 hover:to-purple-700 focus:outline-none focus:ring-2 
                   focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 cursor-retro"
               >
-                {loading ? (
+                {joining ? (
                   <span className="flex items-center">
                     <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

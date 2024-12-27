@@ -4,7 +4,7 @@ import { AuthContext } from '../context/AuthProvider'
 
 function JoinGroup() {
   const { groupId } = useParams()
-  const { user, supabase, login } = useContext(AuthContext)
+  const auth = useContext(AuthContext)
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(true)
@@ -26,7 +26,7 @@ function JoinGroup() {
 
     try {
       // Just check if group exists and is not locked
-      const { data: groupData, error: groupError } = await supabase
+      const { data: groupData, error: groupError } = await auth.supabase
         .from('groups')
         .select('*')
         .eq('id', groupId)
@@ -48,12 +48,12 @@ function JoinGroup() {
       }
 
       // If user is logged in, check if already a member
-      if (user) {
-        const { data: memberData, error: memberError } = await supabase
+      if (auth.user) {
+        const { data: memberData, error: memberError } = await auth.supabase
           .from('group_members')
           .select('*')
           .eq('group_id', groupId)
-          .eq('username', user.username)
+          .eq('username', auth.user.username)
           .single()
 
         if (memberError && memberError.code !== 'PGRST116') throw memberError
@@ -75,7 +75,7 @@ function JoinGroup() {
   }
 
   const handleJoin = async () => {
-    if (!user && !username.trim()) {
+    if (!auth.user && !username.trim()) {
       setError('Please enter a username')
       return
     }
@@ -84,10 +84,10 @@ function JoinGroup() {
     setError(null)
 
     try {
-      const currentUsername = user ? user.username : username.trim()
+      const currentUsername = auth.user ? auth.user.username : username.trim()
 
       // First ensure user exists in users table
-      const { error: userError } = await supabase
+      const { error: userError } = await auth.supabase
         .from('users')
         .insert([{ username: currentUsername }])
         .select()
@@ -97,13 +97,12 @@ function JoinGroup() {
       }
 
       // If not logged in, set the user in context
-      if (!user) {
-        // Call login function with the username
-        login(currentUsername)
+      if (!auth.user) {
+        auth.login(currentUsername)
       }
 
       // Double check group isn't locked
-      const { data: groupData, error: groupError } = await supabase
+      const { data: groupData, error: groupError } = await auth.supabase
         .from('groups')
         .select('is_locked')
         .eq('id', groupId)
@@ -117,7 +116,7 @@ function JoinGroup() {
       }
 
       // Add user to group
-      const { error: joinError } = await supabase
+      const { error: joinError } = await auth.supabase
         .from('group_members')
         .insert([{
           group_id: groupId,
@@ -184,7 +183,7 @@ function JoinGroup() {
               <p className="mt-2 text-2xl font-bold text-indigo-600">
                 {group?.name}
               </p>
-              {!user && (
+              {!auth.user && (
                 <div className="mt-6">
                   <input
                     type="text"
@@ -198,7 +197,7 @@ function JoinGroup() {
               )}
               <button
                 onClick={handleJoin}
-                disabled={joining || (!user && !username.trim())}
+                disabled={joining || (!auth.user && !username.trim())}
                 className="mt-6 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium 
                   text-white bg-gradient-to-r from-indigo-500 to-purple-600 
                   hover:from-indigo-600 hover:to-purple-700 focus:outline-none focus:ring-2 

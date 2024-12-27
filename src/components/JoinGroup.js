@@ -1,10 +1,9 @@
-import { useState, useEffect, useContext } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { AuthContext } from '../context/AuthProvider'
+import { supabase } from '../supabaseClient'
 
 function JoinGroup() {
   const { groupId } = useParams()
-  const auth = useContext(AuthContext)
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(true)
@@ -26,7 +25,7 @@ function JoinGroup() {
 
     try {
       // Just check if group exists and is not locked
-      const { data: groupData, error: groupError } = await auth.supabase
+      const { data: groupData, error: groupError } = await supabase
         .from('groups')
         .select('*')
         .eq('id', groupId)
@@ -47,24 +46,6 @@ function JoinGroup() {
         return
       }
 
-      // If user is logged in, check if already a member
-      if (auth.user) {
-        const { data: memberData, error: memberError } = await auth.supabase
-          .from('group_members')
-          .select('*')
-          .eq('group_id', groupId)
-          .eq('username', auth.user.username)
-          .single()
-
-        if (memberError && memberError.code !== 'PGRST116') throw memberError
-
-        // If user is already a member, redirect to group
-        if (memberData) {
-          navigate(`/group/${groupId}`)
-          return
-        }
-      }
-
       setGroup(groupData)
       setLoading(false)
     } catch (err) {
@@ -75,7 +56,7 @@ function JoinGroup() {
   }
 
   const handleJoin = async () => {
-    if (!auth.user && !username.trim()) {
+    if (!username.trim()) {
       setError('Please enter a username')
       return
     }
@@ -84,52 +65,32 @@ function JoinGroup() {
     setError(null)
 
     try {
-      const currentUsername = auth.user ? auth.user.username : username.trim()
-
       // First ensure user exists in users table
-      const { error: userError } = await auth.supabase
+      const { error: userError } = await supabase
         .from('users')
-        .insert([{ username: currentUsername }])
+        .insert([{ username: username.trim() }])
         .select()
 
       if (userError && !userError.message.includes('duplicate key')) {
         throw userError
       }
 
-      // If not logged in, set the user in context
-      if (!auth.user) {
-        auth.login(currentUsername)
-      }
-
-      // Double check group isn't locked
-      const { data: groupData, error: groupError } = await auth.supabase
-        .from('groups')
-        .select('is_locked')
-        .eq('id', groupId)
-        .single()
-
-      if (groupError) throw groupError
-      if (groupData.is_locked) {
-        setError('This group is no longer accepting new members')
-        setJoining(false)
-        return
-      }
-
       // Add user to group
-      const { error: joinError } = await auth.supabase
+      const { error: joinError } = await supabase
         .from('group_members')
         .insert([{
           group_id: groupId,
-          username: currentUsername,
+          username: username.trim(),
           role: 'member'
         }])
 
       if (joinError) throw joinError
 
-      // Navigate to group page after a short delay to ensure context is updated
-      setTimeout(() => {
-        navigate(`/group/${groupId}`)
-      }, 100)
+      // Save username to localStorage
+      localStorage.setItem('user', JSON.stringify({ username: username.trim() }))
+
+      // Navigate to group page
+      navigate(`/group/${groupId}`)
     } catch (err) {
       console.error('Error joining group:', err)
       setError('Failed to join group')
@@ -183,21 +144,19 @@ function JoinGroup() {
               <p className="mt-2 text-2xl font-bold text-indigo-600">
                 {group?.name}
               </p>
-              {!auth.user && (
-                <div className="mt-6">
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Choose a username..."
-                    className="block w-full px-4 py-2 mt-2 text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm cursor-retro"
-                    disabled={joining}
-                  />
-                </div>
-              )}
+              <div className="mt-6">
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Choose a username..."
+                  className="block w-full px-4 py-2 mt-2 text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm cursor-retro"
+                  disabled={joining}
+                />
+              </div>
               <button
                 onClick={handleJoin}
-                disabled={joining || (!auth.user && !username.trim())}
+                disabled={joining || !username.trim()}
                 className="mt-6 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium 
                   text-white bg-gradient-to-r from-indigo-500 to-purple-600 
                   hover:from-indigo-600 hover:to-purple-700 focus:outline-none focus:ring-2 

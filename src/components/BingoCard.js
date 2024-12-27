@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from 'react'
 import { useParams } from 'react-router-dom'
 import { AuthContext } from '../context/AuthProvider'
+import Breadcrumbs from './Breadcrumbs'
 
 function BingoCard() {
   const { groupId } = useParams()
@@ -146,7 +147,9 @@ function BingoCard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-200 via-pink-200 to-yellow-200 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-2xl mx-auto">
+        <Breadcrumbs group={group} />
+        
         <div className="text-center bg-white border-4 border-double border-blue-500 shadow-lg p-6 rounded-lg">
           <div className="animate-pulse">
             <span className="text-red-500">★</span>

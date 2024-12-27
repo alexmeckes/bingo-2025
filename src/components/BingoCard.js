@@ -12,6 +12,8 @@ function BingoCard() {
   const [group, setGroup] = useState(null)
   const [predictions, setPredictions] = useState([])
   const [bingoGrid, setBingoGrid] = useState(null)
+  const [completedPredictions, setCompletedPredictions] = useState(new Set())
+  const [updating, setUpdating] = useState(false)
 
   useEffect(() => {
     loadCardData()
@@ -25,8 +27,8 @@ function BingoCard() {
     }
 
     try {
-      // Get group details and predictions
-      const [groupResponse, predictionsResponse] = await Promise.all([
+      // Get group details, predictions, and completed predictions
+      const [groupResponse, predictionsResponse, completedResponse] = await Promise.all([
         supabase
           .from('groups')
           .select('*')
@@ -35,20 +37,27 @@ function BingoCard() {
         supabase
           .from('predictions')
           .select('*')
+          .eq('group_id', groupId),
+        supabase
+          .from('completed_predictions')
+          .select('prediction_id')
           .eq('group_id', groupId)
       ])
 
       if (groupResponse.error) throw groupResponse.error
       if (predictionsResponse.error) throw predictionsResponse.error
+      if (completedResponse.error) throw completedResponse.error
 
       const groupData = groupResponse.data
       const predictions = predictionsResponse.data
+      const completed = new Set(completedResponse.data.map(cp => cp.prediction_id))
 
-      // Generate bingo grid
-      const grid = generateBingoGrid(predictions)
+      // Generate bingo grid with completed predictions
+      const grid = generateBingoGrid(predictions, completed)
 
       setGroup(groupData)
       setPredictions(predictions)
+      setCompletedPredictions(completed)
       setBingoGrid(grid)
       setLoading(false)
     } catch (err) {
@@ -58,7 +67,7 @@ function BingoCard() {
     }
   }
 
-  const generateBingoGrid = (predictions) => {
+  const generateBingoGrid = (predictions, completed) => {
     // If we don't have enough predictions, fill with placeholders
     const items = [...predictions]
     while (items.length < 24) {
@@ -77,16 +86,12 @@ function BingoCard() {
     // Create a deterministic color mapping for each user
     const submitterColors = {}
     submitters.forEach((submitter, index) => {
-      // Use the submitter's username to generate a consistent index
       const hash = submitter.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
       const colorIndex = hash % colors.length
-      
-      // If color is taken, find the next available one
       let finalColorIndex = colorIndex
       while (Object.values(submitterColors).includes(colors[finalColorIndex])) {
         finalColorIndex = (finalColorIndex + 1) % colors.length
       }
-      
       submitterColors[submitter] = colors[finalColorIndex]
     })
 
@@ -99,13 +104,14 @@ function BingoCard() {
     
     for (let i = 0; i < 25; i++) {
       if (i === 12) { // Center space
-        grid.push({ type: 'free', content: 'FREE', completed: false })
+        grid.push({ type: 'free', content: 'FREE', completed: true })
       } else {
         const prediction = shuffled[predIndex]
         grid.push({
           type: 'prediction',
+          id: prediction.id,
           content: prediction.content,
-          completed: false,
+          completed: completed.has(prediction.id),
           placeholder: prediction.placeholder,
           username: prediction.username,
           color: prediction.placeholder ? null : submitterColors[prediction.username]
@@ -115,6 +121,47 @@ function BingoCard() {
     }
 
     return grid
+  }
+
+  const handlePredictionClick = async (index) => {
+    if (!bingoGrid || updating) return
+    const cell = bingoGrid[index]
+    if (cell.type === 'free' || cell.placeholder) return
+
+    setUpdating(true)
+    try {
+      const newCompleted = new Set(completedPredictions)
+      if (newCompleted.has(cell.id)) {
+        // Remove completion
+        await supabase
+          .from('completed_predictions')
+          .delete()
+          .eq('prediction_id', cell.id)
+          .eq('group_id', groupId)
+        newCompleted.delete(cell.id)
+      } else {
+        // Add completion
+        await supabase
+          .from('completed_predictions')
+          .insert([{
+            prediction_id: cell.id,
+            group_id: groupId,
+            completed_by: user.username
+          }])
+        newCompleted.add(cell.id)
+      }
+
+      // Update local state
+      setCompletedPredictions(newCompleted)
+      const newGrid = [...bingoGrid]
+      newGrid[index] = { ...cell, completed: !cell.completed }
+      setBingoGrid(newGrid)
+    } catch (err) {
+      console.error('Error updating prediction:', err)
+      setError('Failed to update prediction')
+    } finally {
+      setUpdating(false)
+    }
   }
 
   const getColorClasses = (color) => {
@@ -213,6 +260,7 @@ function BingoCard() {
               {bingoGrid.map((cell, index) => (
                 <div
                   key={index}
+                  onClick={() => handlePredictionClick(index)}
                   className={`
                     aspect-square p-2 rounded-lg text-sm flex items-center justify-center text-center relative
                     transform transition-transform hover:scale-105 hover:shadow-xl cursor-retro
@@ -224,11 +272,17 @@ function BingoCard() {
                           ? 'bg-gradient-to-br from-green-300 to-green-500 text-white'
                           : getColorClasses(cell.color)
                     }
+                    ${!cell.placeholder && cell.type !== 'free' ? 'border-2' : ''}
                   `}
                 >
                   {cell.content}
                   {!cell.placeholder && cell.type !== 'free' && (
                     <div className={`absolute bottom-1 right-1 w-2 h-2 rounded-full ${getDotColor(cell.color)}`} />
+                  )}
+                  {cell.completed && cell.type !== 'free' && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 rounded-lg">
+                      <span className="text-2xl">✓</span>
+                    </div>
                   )}
                 </div>
               ))}

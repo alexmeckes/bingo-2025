@@ -389,17 +389,41 @@ function SubmitPrediction() {
               </button>
             </div>
 
-            {/* Show who still needs to submit */}
+            {/* Group Progress */}
             <div className="bg-white border-4 border-double border-amber-500 shadow-lg rounded-lg">
               <div className="px-4 py-5 sm:p-6">
                 <h3 className="text-lg font-bold bg-gradient-to-r from-amber-600 to-orange-600 text-transparent bg-clip-text mb-4">
                   Group Progress
                 </h3>
-                <div className="text-sm text-gray-500">
-                  {allPredictions.length > 0 
-                    ? `✨ ${allPredictions.length} predictions submitted so far ✨`
-                    : 'No predictions submitted yet'}
-                </div>
+                {allPredictions.length > 0 ? (
+                  <div className="space-y-4">
+                    {/* Group predictions by submitter */}
+                    {Object.entries(
+                      allPredictions.reduce((acc, pred) => {
+                        if (!acc[pred.username]) acc[pred.username] = [];
+                        acc[pred.username].push(pred);
+                        return acc;
+                      }, {})
+                    ).map(([username, predictions]) => (
+                      <div key={username} className="bg-gradient-to-br from-gray-50 to-amber-50 rounded-lg p-4 border-2 border-amber-200">
+                        <p className="text-sm font-medium bg-gradient-to-r from-amber-600 to-orange-600 text-transparent bg-clip-text mb-2">
+                          {username === user.username ? '✨ Your predictions' : `${username}'s predictions`}
+                        </p>
+                        <div className="space-y-2">
+                          {predictions.map((prediction, idx) => (
+                            <p key={idx} className="text-sm text-gray-600 pl-4 border-l-2 border-amber-200">
+                              {prediction.content}
+                            </p>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-gray-500 py-4">
+                    No predictions submitted yet
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -66,17 +66,29 @@ function BingoCard() {
     }
 
     // Get unique submitters and assign them colors
-    const submitters = [...new Set(items.filter(p => !p.placeholder).map(p => p.submitted_by))]
+    const submitters = [...new Set(items.filter(p => !p.placeholder).map(p => p.username))]
     const colors = [
       'indigo', 'emerald', 'amber', 'rose', 'violet', 
-      'cyan', 'fuchsia', 'lime', 'orange', 'teal'
+      'cyan', 'fuchsia', 'lime', 'orange', 'teal',
+      'blue', 'green', 'yellow', 'red', 'purple',
+      'sky', 'pink', 'slate', 'stone', 'neutral'
     ]
-    const submitterColors = Object.fromEntries(
-      submitters.map((submitter, i) => [
-        submitter, 
-        colors[i % colors.length]
-      ])
-    )
+
+    // Create a deterministic color mapping for each user
+    const submitterColors = {}
+    submitters.forEach((submitter, index) => {
+      // Use the submitter's username to generate a consistent index
+      const hash = submitter.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+      const colorIndex = hash % colors.length
+      
+      // If color is taken, find the next available one
+      let finalColorIndex = colorIndex
+      while (Object.values(submitterColors).includes(colors[finalColorIndex])) {
+        finalColorIndex = (finalColorIndex + 1) % colors.length
+      }
+      
+      submitterColors[submitter] = colors[finalColorIndex]
+    })
 
     // Shuffle predictions and select 24 (leaving center as FREE)
     const shuffled = items.sort(() => Math.random() - 0.5).slice(0, 24)
@@ -95,8 +107,8 @@ function BingoCard() {
           content: prediction.content,
           completed: false,
           placeholder: prediction.placeholder,
-          submitted_by: prediction.submitted_by,
-          color: prediction.placeholder ? null : submitterColors[prediction.submitted_by]
+          username: prediction.username,
+          color: prediction.placeholder ? null : submitterColors[prediction.username]
         })
         predIndex++
       }
@@ -116,7 +128,17 @@ function BingoCard() {
       fuchsia: 'bg-fuchsia-50 border-fuchsia-200 hover:border-fuchsia-500',
       lime: 'bg-lime-50 border-lime-200 hover:border-lime-500',
       orange: 'bg-orange-50 border-orange-200 hover:border-orange-500',
-      teal: 'bg-teal-50 border-teal-200 hover:border-teal-500'
+      teal: 'bg-teal-50 border-teal-200 hover:border-teal-500',
+      blue: 'bg-blue-50 border-blue-200 hover:border-blue-500',
+      green: 'bg-green-50 border-green-200 hover:border-green-500',
+      yellow: 'bg-yellow-50 border-yellow-200 hover:border-yellow-500',
+      red: 'bg-red-50 border-red-200 hover:border-red-500',
+      purple: 'bg-purple-50 border-purple-200 hover:border-purple-500',
+      sky: 'bg-sky-50 border-sky-200 hover:border-sky-500',
+      pink: 'bg-pink-50 border-pink-200 hover:border-pink-500',
+      slate: 'bg-slate-50 border-slate-200 hover:border-slate-500',
+      stone: 'bg-stone-50 border-stone-200 hover:border-stone-500',
+      neutral: 'bg-neutral-50 border-neutral-200 hover:border-neutral-500'
     }
     return colorMap[color] || ''
   }
@@ -132,7 +154,17 @@ function BingoCard() {
       fuchsia: 'bg-fuchsia-400',
       lime: 'bg-lime-400',
       orange: 'bg-orange-400',
-      teal: 'bg-teal-400'
+      teal: 'bg-teal-400',
+      blue: 'bg-blue-400',
+      green: 'bg-green-400',
+      yellow: 'bg-yellow-400',
+      red: 'bg-red-400',
+      purple: 'bg-purple-400',
+      sky: 'bg-sky-400',
+      pink: 'bg-pink-400',
+      slate: 'bg-slate-400',
+      stone: 'bg-stone-400',
+      neutral: 'bg-neutral-400'
     }
     return colorMap[color] || ''
   }

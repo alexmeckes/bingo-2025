@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { supabase } from '../supabaseClient'
+import { AuthContext } from '../context/AuthProvider'
 
 function JoinGroup() {
   const { groupId } = useParams()
+  const { supabase, login } = useContext(AuthContext)
   const navigate = useNavigate()
 
   const [loading, setLoading] = useState(true)
@@ -86,8 +87,8 @@ function JoinGroup() {
 
       if (joinError) throw joinError
 
-      // Save username to localStorage
-      localStorage.setItem('user', JSON.stringify({ username: username.trim() }))
+      // Set user in context and localStorage
+      login(username.trim())
 
       // Navigate to group page
       navigate(`/group/${groupId}`)

@@ -30,13 +30,16 @@ function CreateGroup() {
     try {
       // Get current username from localStorage if user is null
       const storedUser = localStorage.getItem('user')
+      console.log('Stored user:', storedUser)
       const currentUsername = user ? user.username : (storedUser ? JSON.parse(storedUser).username : null)
+      console.log('Current username:', currentUsername)
 
       if (!currentUsername) {
         throw new Error('Please sign in to create a group')
       }
 
       // Create group
+      console.log('Creating group with name:', groupName, 'and organizer:', currentUsername)
       const { data: group, error: groupError } = await supabase
         .from('groups')
         .insert([{
@@ -47,7 +50,12 @@ function CreateGroup() {
         .select()
         .single()
 
-      if (groupError) throw groupError
+      if (groupError) {
+        console.error('Group creation error:', groupError)
+        throw groupError
+      }
+
+      console.log('Group created:', group)
 
       // Add creator as member
       const { error: memberError } = await supabase
@@ -58,13 +66,16 @@ function CreateGroup() {
           role: 'admin'
         }])
 
-      if (memberError) throw memberError
+      if (memberError) {
+        console.error('Member creation error:', memberError)
+        throw memberError
+      }
 
       // Navigate to the new group
       navigate(`/group/${group.id}`)
     } catch (err) {
-      console.error('Error creating group:', err)
-      setError('Failed to create group')
+      console.error('Detailed error:', err)
+      setError(err.message || 'Failed to create group')
       setSubmitting(false)
     }
   }

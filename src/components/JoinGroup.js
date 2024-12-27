@@ -75,7 +75,7 @@ function JoinGroup() {
   }
 
   const handleJoin = async () => {
-    if (!username.trim()) {
+    if (!user && !username.trim()) {
       setError('Please enter a username')
       return
     }
@@ -84,14 +84,21 @@ function JoinGroup() {
     setError(null)
 
     try {
-      // First ensure user exists in users table
-      const { error: userError } = await supabase
-        .from('users')
-        .insert([{ username: username.trim() }])
-        .select()
+      // If not logged in, create user and set in context
+      if (!user) {
+        // First ensure user exists in users table
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .insert([{ username: username.trim() }])
+          .select()
+          .single()
 
-      if (userError && !userError.message.includes('duplicate key')) {
-        throw userError
+        if (userError && !userError.message.includes('duplicate key')) {
+          throw userError
+        }
+
+        // Set the user in local storage
+        localStorage.setItem('user', JSON.stringify({ username: username.trim() }))
       }
 
       // Double check group isn't locked
@@ -113,7 +120,7 @@ function JoinGroup() {
         .from('group_members')
         .insert([{
           group_id: groupId,
-          username: username.trim(),
+          username: user ? user.username : username.trim(),
           role: 'member'
         }])
 
@@ -187,7 +194,7 @@ function JoinGroup() {
                 </div>
               )}
               <button
-                onClick={user ? handleJoin : handleJoin}
+                onClick={handleJoin}
                 disabled={joining || (!user && !username.trim())}
                 className="mt-6 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium 
                   text-white bg-gradient-to-r from-indigo-500 to-purple-600 

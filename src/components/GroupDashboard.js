@@ -3,6 +3,80 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { AuthContext } from '../context/AuthProvider'
 import Breadcrumbs from './Breadcrumbs'
 
+// Color mapping for users
+const colors = [
+  'indigo', 'emerald', 'amber', 'rose', 'violet', 
+  'cyan', 'fuchsia', 'lime', 'orange', 'teal',
+  'blue', 'green', 'yellow', 'red', 'purple',
+  'sky', 'pink', 'slate', 'stone', 'neutral'
+]
+
+const getColorForUser = (username, existingColors = {}) => {
+  // Use the username to generate a consistent index
+  const hash = username.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  const colorIndex = hash % colors.length
+  
+  // If color is taken, find the next available one
+  let finalColorIndex = colorIndex
+  while (Object.values(existingColors).includes(colors[finalColorIndex])) {
+    finalColorIndex = (finalColorIndex + 1) % colors.length
+  }
+  
+  return colors[finalColorIndex]
+}
+
+const getDotColor = (color) => {
+  const colorMap = {
+    indigo: 'bg-indigo-400',
+    emerald: 'bg-emerald-400',
+    amber: 'bg-amber-400',
+    rose: 'bg-rose-400',
+    violet: 'bg-violet-400',
+    cyan: 'bg-cyan-400',
+    fuchsia: 'bg-fuchsia-400',
+    lime: 'bg-lime-400',
+    orange: 'bg-orange-400',
+    teal: 'bg-teal-400',
+    blue: 'bg-blue-400',
+    green: 'bg-green-400',
+    yellow: 'bg-yellow-400',
+    red: 'bg-red-400',
+    purple: 'bg-purple-400',
+    sky: 'bg-sky-400',
+    pink: 'bg-pink-400',
+    slate: 'bg-slate-400',
+    stone: 'bg-stone-400',
+    neutral: 'bg-neutral-400'
+  }
+  return colorMap[color] || ''
+}
+
+const getTextColor = (color) => {
+  const colorMap = {
+    indigo: 'text-indigo-600',
+    emerald: 'text-emerald-600',
+    amber: 'text-amber-600',
+    rose: 'text-rose-600',
+    violet: 'text-violet-600',
+    cyan: 'text-cyan-600',
+    fuchsia: 'text-fuchsia-600',
+    lime: 'text-lime-600',
+    orange: 'text-orange-600',
+    teal: 'text-teal-600',
+    blue: 'text-blue-600',
+    green: 'text-green-600',
+    yellow: 'text-yellow-600',
+    red: 'text-red-600',
+    purple: 'text-purple-600',
+    sky: 'text-sky-600',
+    pink: 'text-pink-600',
+    slate: 'text-slate-600',
+    stone: 'text-stone-600',
+    neutral: 'text-neutral-600'
+  }
+  return colorMap[color] || ''
+}
+
 function GroupDashboard() {
   const { groupId } = useParams()
   const { user, supabase } = useContext(AuthContext)
@@ -172,6 +246,15 @@ function GroupDashboard() {
     }
   }
 
+  // Assign colors to members
+  const getMemberColors = (members) => {
+    const colorMap = {}
+    members.forEach(member => {
+      colorMap[member.username] = getColorForUser(member.username, colorMap)
+    })
+    return colorMap
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -332,21 +415,24 @@ function GroupDashboard() {
               </h3>
             </div>
             <ul className="divide-y divide-gray-200">
-              {members.map((member) => (
-                <li key={member.username} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {member.username}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
-                      </p>
+              {members.map((member) => {
+                const color = getColorForUser(member.username)
+                return (
+                  <li key={member.username} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className={`text-sm font-medium ${getTextColor(color)}`}>
+                          {member.username}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                        </p>
+                      </div>
+                      <div className={`h-2 w-2 rounded-full ${getDotColor(color)}`}></div>
                     </div>
-                    <div className="h-2 w-2 rounded-full bg-violet-400"></div>
-                  </div>
-                </li>
-              ))}
+                  </li>
+                )
+              })}
             </ul>
           </div>
         </div>

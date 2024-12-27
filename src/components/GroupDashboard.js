@@ -18,6 +18,7 @@ function GroupDashboard() {
   })
   const [copied, setCopied] = useState(false)
   const [recentGroups, setRecentGroups] = useState([])
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     loadGroupData()
@@ -86,12 +87,18 @@ function GroupDashboard() {
       if (membersResponse.error) throw membersResponse.error
       if (predictionsResponse.error) throw predictionsResponse.error
 
+      // Check if current user is admin
+      const isUserAdmin = membersResponse.data?.some(
+        member => member.username === user.username && member.role === 'admin'
+      )
+
       setGroup(groupData)
       setMembers(membersResponse.data || [])
       setUserPredictionCount(predictionsResponse.data.length)
       setStats({
         memberCount: membersResponse.data?.length || 0
       })
+      setIsAdmin(isUserAdmin)
       
       // Add to recent groups
       addToRecentGroups(groupData)
@@ -101,6 +108,23 @@ function GroupDashboard() {
       setError(err.message || 'Failed to load group data')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleToggleLock = async () => {
+    try {
+      const { error } = await supabase
+        .from('groups')
+        .update({ is_locked: !group.is_locked })
+        .eq('id', groupId)
+
+      if (error) throw error
+
+      // Refresh group data
+      loadGroupData()
+    } catch (err) {
+      console.error('Error toggling lock:', err)
+      setError('Failed to update group settings')
     }
   }
 
@@ -176,6 +200,11 @@ function GroupDashboard() {
           <p className="mt-2 font-bold tracking-widest text-blue-600">
             {group?.status ? `${group.status.charAt(0).toUpperCase()}${group.status.slice(1)} Phase` : 'Submission Phase'}
           </p>
+          {group?.is_locked && (
+            <p className="mt-2 text-sm font-medium text-red-600">
+              🔒 This group is locked
+            </p>
+          )}
           <div className="animate-pulse mt-2">
             <span className="text-red-500">★</span>
             <span className="text-yellow-500">★</span>
@@ -220,7 +249,7 @@ function GroupDashboard() {
           {/* Stats Card */}
           <div className="bg-white border-4 border-double border-amber-500 shadow-lg p-6 rounded-lg transform hover:scale-105 transition-transform">
             <h3 className="text-lg font-bold bg-gradient-to-r from-amber-600 to-orange-600 text-transparent bg-clip-text">
-              Group Stats
+              Group Settings
             </h3>
             <dl className="mt-4">
               <div>
@@ -240,6 +269,17 @@ function GroupDashboard() {
               >
                 {copied ? '✨ Link Copied! ✨' : '✨ Copy Invite Link ✨'}
               </button>
+              {isAdmin && (
+                <button
+                  onClick={handleToggleLock}
+                  className="w-full flex justify-center py-2 px-4 border border-transparent cursor-retro
+                    bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700
+                    text-white rounded-md shadow-sm text-sm font-medium 
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+                >
+                  {group?.is_locked ? '🔓 Unlock Group' : '🔒 Lock Group'}
+                </button>
+              )}
               <button
                 onClick={() => navigate(`/group/${groupId}/card`)}
                 className="w-full flex justify-center py-2 px-4 border border-transparent cursor-retro

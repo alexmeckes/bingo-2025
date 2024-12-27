@@ -17,10 +17,40 @@ function GroupDashboard() {
     memberCount: 0
   })
   const [copied, setCopied] = useState(false)
+  const [recentGroups, setRecentGroups] = useState([])
 
   useEffect(() => {
     loadGroupData()
+    loadRecentGroups()
   }, [groupId])
+
+  const loadRecentGroups = () => {
+    const storedGroups = localStorage.getItem('recentGroups')
+    if (storedGroups) {
+      setRecentGroups(JSON.parse(storedGroups))
+    }
+  }
+
+  const addToRecentGroups = (groupData) => {
+    const storedGroups = localStorage.getItem('recentGroups')
+    let groups = storedGroups ? JSON.parse(storedGroups) : []
+    
+    // Remove if already exists
+    groups = groups.filter(g => g.id !== groupData.id)
+    
+    // Add to beginning of array
+    groups.unshift({
+      id: groupData.id,
+      name: groupData.name,
+      timestamp: new Date().toISOString()
+    })
+    
+    // Keep only last 5 groups
+    groups = groups.slice(0, 5)
+    
+    localStorage.setItem('recentGroups', JSON.stringify(groups))
+    setRecentGroups(groups)
+  }
 
   const loadGroupData = async () => {
     if (!groupId) {
@@ -62,6 +92,9 @@ function GroupDashboard() {
       setStats({
         memberCount: membersResponse.data?.length || 0
       })
+      
+      // Add to recent groups
+      addToRecentGroups(groupData)
       
     } catch (err) {
       console.error('Error loading group:', err)
@@ -218,6 +251,38 @@ function GroupDashboard() {
               </button>
             </div>
           </div>
+
+          {/* Recent Groups */}
+          {recentGroups.length > 0 && (
+            <div className="lg:col-span-2 bg-white border-4 border-double border-pink-500 shadow-lg rounded-lg">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <h3 className="text-lg font-bold bg-gradient-to-r from-pink-600 to-rose-600 text-transparent bg-clip-text">
+                  Recent Groups
+                </h3>
+              </div>
+              <ul className="divide-y divide-gray-200">
+                {recentGroups.map((recentGroup) => (
+                  <li 
+                    key={recentGroup.id} 
+                    onClick={() => navigate(`/group/${recentGroup.id}`)}
+                    className="px-6 py-4 hover:bg-gray-50 transition-colors cursor-retro"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {recentGroup.name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          Last visited: {new Date(recentGroup.timestamp).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="h-2 w-2 rounded-full bg-pink-400"></div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Members List */}
           <div className="lg:col-span-2 bg-white border-4 border-double border-violet-500 shadow-lg rounded-lg">

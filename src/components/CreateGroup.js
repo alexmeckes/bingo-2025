@@ -1,113 +1,70 @@
-import { useState, useContext } from 'react'
+import { useState, useEffect, useContext } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AuthContext } from '../context/AuthProvider'
 
 function CreateGroup() {
   const { user, supabase } = useContext(AuthContext)
   const navigate = useNavigate()
-  
+
   const [groupName, setGroupName] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
-  const [inviteLink, setInviteLink] = useState('')
-  const [copied, setCopied] = useState(false)
+  const [recentGroups, setRecentGroups] = useState([])
 
-  const handleCreateGroup = async (e) => {
-    e.preventDefault()
-    setError(null)
-    setInviteLink('')
-    
-    if (!groupName.trim()) {
-      setError('Please enter a group name')
-      return
-    }
+  useEffect(() => {
+    loadRecentGroups()
+  }, [])
 
-    console.log('Current user:', user) // Debug log
-
-    setLoading(true)
-    try {
-      // First ensure user exists in users table
-      const { error: userError } = await supabase
-        .from('users')
-        .insert([{ username: user.username }])
-        .select()
-
-      if (userError && !userError.message.includes('duplicate key')) {
-        throw userError
-      }
-
-      console.log('Attempting to create group with:', { // Debug log
-        name: groupName.trim(),
-        organizer_username: user.username,
-        status: 'submission'
-      })
-
-      // Insert into groups table
-      const { data: groupData, error: groupError } = await supabase
-        .from('groups')
-        .insert([
-          {
-            name: groupName.trim(),
-            organizer_username: user.username,
-            status: 'submission'
-          }
-        ])
-        .select()
-
-      if (groupError) {
-        console.error('Group creation error:', groupError) // Debug log
-        throw groupError
-      }
-
-      console.log('Group created:', groupData) // Debug log
-
-      // Add organizer to group_members table
-      const { error: memberError } = await supabase
-        .from('group_members')
-        .insert([
-          {
-            group_id: groupData[0].id,
-            username: user.username,
-            role: 'organizer'
-          }
-        ])
-
-      if (memberError) {
-        console.error('Member creation error:', memberError) // Debug log
-        throw memberError
-      }
-
-      // Generate invite link
-      const inviteUrl = `${window.location.origin}/join/${groupData[0].id}`
-      setInviteLink(inviteUrl)
-      
-      // Navigate to group page after 3 seconds
-      setTimeout(() => {
-        navigate(`/group/${groupData[0].id}`)
-      }, 3000)
-
-    } catch (err) {
-      console.error('Full error:', err) // Debug log
-      setError(err.message)
-    } finally {
-      setLoading(false)
+  const loadRecentGroups = () => {
+    const storedGroups = localStorage.getItem('recentGroups')
+    if (storedGroups) {
+      setRecentGroups(JSON.parse(storedGroups))
     }
   }
 
-  const copyInviteLink = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setError(null)
+    setSubmitting(true)
+
     try {
-      await navigator.clipboard.writeText(inviteLink)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      // Create group
+      const { data: group, error: groupError } = await supabase
+        .from('groups')
+        .insert([{
+          name: groupName,
+          organizer_username: user.username,
+          status: 'submission'
+        }])
+        .select()
+        .single()
+
+      if (groupError) throw groupError
+
+      // Add creator as member
+      const { error: memberError } = await supabase
+        .from('group_members')
+        .insert([{
+          group_id: group.id,
+          username: user.username,
+          role: 'admin'
+        }])
+
+      if (memberError) throw memberError
+
+      // Navigate to the new group
+      navigate(`/group/${group.id}`)
     } catch (err) {
-      setError('Failed to copy link')
+      console.error('Error creating group:', err)
+      setError('Failed to create group')
+      setSubmitting(false)
     }
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-200 via-pink-200 to-yellow-200 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
-        {/* Welcome Header */}
+        {/* Create Group Card */}
         <div className="text-center bg-white border-4 border-double border-blue-500 shadow-lg p-6 rounded-lg">
           <div className="animate-pulse">
             <span className="text-red-500">★</span>
@@ -115,11 +72,8 @@ function CreateGroup() {
             <span className="text-green-500">★</span>
           </div>
           <h2 className="text-4xl font-bold bg-gradient-to-r from-purple-600 via-pink-500 to-red-500 text-transparent bg-clip-text">
-            Prediction Bingo
+            Create a Prediction Group
           </h2>
-          <p className="mt-2 font-bold tracking-widest text-blue-600">
-            Make predictions with friends!
-          </p>
           <div className="animate-pulse mt-2">
             <span className="text-red-500">★</span>
             <span className="text-yellow-500">★</span>
@@ -127,20 +81,16 @@ function CreateGroup() {
           </div>
         </div>
 
+        {error && (
+          <div className="mt-8 border-2 border-red-500 bg-red-100 p-4 animate-pulse rounded-md">
+            <div className="text-sm text-red-700 font-bold blink">{error}</div>
+          </div>
+        )}
+
         {/* Create Group Form */}
         <div className="mt-8 bg-white border-4 border-double border-emerald-500 shadow-lg rounded-lg">
           <div className="px-4 py-5 sm:p-6">
-            <h3 className="text-lg font-bold bg-gradient-to-r from-emerald-600 to-teal-600 text-transparent bg-clip-text mb-4">
-              Create a New Group
-            </h3>
-
-            {error && (
-              <div className="mb-6 border-2 border-red-500 bg-red-100 p-4 animate-pulse rounded-md">
-                <div className="text-sm text-red-700 font-bold blink">{error}</div>
-              </div>
-            )}
-
-            <form onSubmit={handleCreateGroup} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label htmlFor="groupName" className="block text-sm font-medium text-gray-700">
                   Group Name
@@ -149,30 +99,27 @@ function CreateGroup() {
                   type="text"
                   name="groupName"
                   id="groupName"
-                  required
-                  className="mt-1 block w-full shadow-sm sm:text-sm 
-                    border-2 border-emerald-200 rounded-md
-                    bg-gradient-to-br from-white to-emerald-50
-                    hover:border-emerald-300 transition-colors cursor-retro
-                    focus:ring-emerald-500 focus:border-emerald-500"
-                  placeholder="e.g., Summer 2024 Predictions"
                   value={groupName}
                   onChange={(e) => setGroupName(e.target.value)}
-                  disabled={loading}
+                  placeholder="Enter a fun name for your group..."
+                  required
+                  className="mt-1 block w-full shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm 
+                    border-2 border-indigo-200 rounded-md bg-gradient-to-br from-white to-indigo-50
+                    hover:border-indigo-300 transition-colors cursor-retro"
+                  disabled={submitting}
                 />
               </div>
 
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={submitting || !groupName.trim()}
                   className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium 
-                    text-white bg-gradient-to-r from-emerald-500 to-teal-600 
-                    hover:from-emerald-600 hover:to-teal-700
-                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500
-                    disabled:opacity-50 cursor-retro"
+                    text-white bg-gradient-to-r from-indigo-500 to-purple-600 
+                    hover:from-indigo-600 hover:to-purple-700 focus:outline-none focus:ring-2 
+                    focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 cursor-retro"
                 >
-                  {loading ? (
+                  {submitting ? (
                     <span className="flex items-center">
                       <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -189,10 +136,42 @@ function CreateGroup() {
           </div>
         </div>
 
+        {/* Recent Groups */}
+        {recentGroups.length > 0 && (
+          <div className="mt-8 bg-white border-4 border-double border-pink-500 shadow-lg rounded-lg">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-bold bg-gradient-to-r from-pink-600 to-rose-600 text-transparent bg-clip-text">
+                Your Recent Groups
+              </h3>
+            </div>
+            <ul className="divide-y divide-gray-200">
+              {recentGroups.map((group) => (
+                <li 
+                  key={group.id} 
+                  onClick={() => navigate(`/group/${group.id}`)}
+                  className="px-6 py-4 hover:bg-gray-50 transition-colors cursor-retro"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {group.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Last visited: {new Date(group.timestamp).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="h-2 w-2 rounded-full bg-pink-400"></div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Marquee */}
         <div className="mt-8 overflow-hidden">
           <div className="text-center font-bold text-blue-600 animate-marquee whitespace-nowrap">
-            ⭐ WELCOME TO PREDICTION BINGO! ⭐ CREATE A GROUP! ⭐ INVITE FRIENDS! ⭐ MAKE PREDICTIONS! ⭐ HAVE FUN! ⭐
+            ⭐ CREATE A NEW GROUP! ⭐ INVITE YOUR FRIENDS! ⭐ MAKE PREDICTIONS! ⭐
           </div>
         </div>
       </div>

@@ -227,6 +227,11 @@ function GroupDashboard() {
               text: 'View Bingo Card',
               href: `/group/${groupId}/card`,
               primary: true
+            },
+            {
+              text: 'Edit Predictions',
+              href: `/group/${groupId}/submit`,
+              primary: false
             }
           ]
         }

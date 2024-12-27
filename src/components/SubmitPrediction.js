@@ -53,8 +53,8 @@ function SubmitPrediction() {
 
       const groupData = groupResponse.data
       
-      // Validate group status
-      if (groupData.status !== 'submission') {
+      // Allow editing in both submission and active phases
+      if (groupData.status !== 'submission' && groupData.status !== 'active') {
         setError('This group is no longer accepting predictions')
         setLoading(false)
         return
